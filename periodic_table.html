@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>科幻霓虹交互式化学元素周期表</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: #0d0f12;
+            color: #ffffff;
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            margin-bottom: 15px;
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+            color: #00e5ff;
+        }
+        
+        /* 传奇面板/图例 */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 25px;
+            max-width: 1400px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .legend-item:hover {
+            transform: scale(1.05);
+        }
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+        }
+
+        /* 周期表网格主布局 */
+        .periodic-table {
+            display: grid;
+            grid-template-columns: repeat(18, minmax(65px, 1fr));
+            grid-template-rows: repeat(10, minmax(70px, 1fr));
+            gap: 5px;
+            width: 100%;
+            max-width: 1400px;
+            margin-bottom: 30px;
+        }
+        
+        /* 空白占位行间隔 */
+        .periodic-table-spacer {
+            grid-column: 1 / span 18;
+            grid-row: 8;
+            height: 20px;
+            pointer-events: none;
+        }
+
+        /* 元素盒子基础样式 */
+        .element {
+            background: rgba(20, 24, 30, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 4px 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+        }
+        
+        .element:hover {
+            transform: translateY(-3px) scale(1.03);
+            z-index: 10;
+            box-shadow: 0 0 15px var(--neon-color);
+            background: rgba(30, 36, 45, 0.95);
+        }
+        
+        .element.active {
+            background: rgba(35, 45, 60, 0.95);
+            border-width: 2px;
+            border-color: var(--neon-color) !important;
+            box-shadow: 0 0 20px var(--neon-color), inset 0 0 8px var(--neon-color);
+        }
+
+        /* 元素内部文字细节排版 */
+        .element .num {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            font-weight: bold;
+        }
+        .element .sym {
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            color: var(--neon-color);
+            text-shadow: 0 0 4px var(--neon-color);
+        }
+        .element .name {
+            font-size: 11px;
+            text-align: center;
+            color: #ffffff;
+            margin-top: -2px;
+        }
+        .element .mass {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.4);
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        /* 信息弹窗/介绍面板 */
+        .info-panel {
+            width: 100%;
+            max-width: 1400px;
+            background: rgba(20, 24, 33, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .info-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--panel-accent, #555);
+            transition: background 0.3s ease;
+        }
+
+        .info-placeholder {
+            color: rgba(255, 255, 255, 0.4);
+            text-align: center;
+            font-style: italic;
+            padding: 20px 0;
+            font-size: 15px;
+        }
+
+        .info-content {
+            display: none;
+        }
+
+        .info-header {
+            display: flex;
+            align-items: baseline;
+            gap: 15px;
+            margin-bottom: 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 12px;
+        }
+
+        .info-title-sym {
+            font-size: 42px;
+            font-weight: 800;
+            color: var(--panel-accent);
+            text-shadow: 0 0 10px var(--panel-accent);
+            line-height: 1;
+        }
+
+        .info-title-name {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .info-title-eng {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-meta-item {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .info-meta-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-bottom: 4px;
+        }
+
+        .info-meta-val {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .info-desc-box {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 15px 20px;
+            border-radius: 8px;
+            border-left: 3px solid var(--panel-accent);
+            line-height: 1.6;
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        /* 针对特定行或占位块的处理 */
+        .lanthanide-indicator, .actinide-indicator {
+            border-style: dashed;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>化学元素周期表 (THE PERIODIC TABLE OF ELEMENTS)</h1>
+
+    <!-- 顶部化学分类图例 -->
+    <div class="legend" id="legend"></div>
+
+    <!-- 周期表主网格 -->
+    <div class="periodic-table" id="periodic-table">
+        <!-- 间隔块 -->
+        <div class="periodic-table-spacer"></div>
+    </div>
+
+    <!-- 底部详情展示面板 -->
+    <div class="info-panel" id="info-panel">
+        <div class="info-placeholder" id="info-placeholder">💡 用鼠标点击上方网格中的任何化学元素，查看其高精度数据及核心用途介绍...</div>
+        <div class="info-content" id="info-content">
+            <div class="info-header">
+                <span class="info-title-sym" id="p-sym">H</span>
+                <span class="info-title-name" id="p-name">氢</span>
+                <span class="info-title-eng" id="p-eng">Hydrogen</span>
+            </div>
+            <div class="info-grid">
+                <div class="info-meta-item">
+                    <div class="info-meta-label">原子序数 (Atomic Number)</div>
+                    <div class="info-meta-val" id="p-num">1</div>
+                </div>
+                <div class="info-meta-item">
+                    <div class="info-meta-label">相对原子质量 (Atomic Mass)</div>
+                    <div class="info-meta-val" id="p-mass">1.008</div>
+                </div>
+                <div class="info-meta-item">
+                    <div class="info-meta-label">化学类别 (Category)</div>
+                    <div class="info-meta-val" id="p-cat">其他非金属</div>
+                </div>
+            </div>
+            <div class="info-desc-box" id="p-desc"></div>
+        </div>
+    </div>
+
+    <script>
+        // 核心元素数据注入
+        const elements = [{"num": 1, "sym": "H", "name": "氢", "eng": "Hydrogen", "mass": "1.008", "cat": "Other Nonmetals", "row": 1, "col": 1, "desc": "宇宙中含量最多的元素，是水和所有有机物的重要组成部分，极具潜力的清洁能源。"}, {"num": 2, "sym": "He", "name": "氦", "eng": "Helium", "mass": "4.0026", "cat": "Noble Gases", "row": 1, "col": 18, "desc": "无色无味的惰性气体，密度极低且极不活泼，常用于飞艇充气、深海潜水及超导低温冷却。"}, {"num": 3, "sym": "Li", "name": "锂", "eng": "Lithium", "mass": "6.94", "cat": "Alkali Metals", "row": 2, "col": 1, "desc": "最轻的金属元素，拥有极高的电化学势，是现代智能手机、电动汽车锂电池的核心材料。"}, {"num": 4, "sym": "Be", "name": "铍", "eng": "Beryllium", "mass": "9.0122", "cat": "Alkaline Earth Metals", "row": 2, "col": 2, "desc": "钢灰色轻金属，熔点高且具极佳的刚性，广泛应用于航空航天高精度结构件及X射线管窗口。"}, {"num": 5, "sym": "B", "name": "硼", "eng": "Boron", "mass": "10.81", "cat": "Metalloids", "row": 2, "col": 13, "desc": "黑色或暗褐色准金属，高硬度，常用于制造耐热高硼硅玻璃、半导体掺杂物及防弹装甲。"}, {"num": 6, "sym": "C", "name": "碳", "eng": "Carbon", "mass": "12.011", "cat": "Other Nonmetals", "row": 2, "col": 14, "desc": "地球生命的基石，能形成金刚石、石墨、碳纳米管和石墨烯等多种性质截然不同的同素异形体。"}, {"num": 7, "sym": "N", "name": "氮", "eng": "Nitrogen", "mass": "14.007", "cat": "Other Nonmetals", "row": 2, "col": 15, "desc": "空气中含量最多的气体（约78%），化学性质不活泼，液氮常用于食品速冻和生物样本超低温保存。"}, {"num": 8, "sym": "O", "name": "氧", "eng": "Oxygen", "mass": "15.999", "cat": "Other Nonmetals", "row": 2, "col": 16, "desc": "维持动植物呼吸和物质燃烧必不可少的元素，地壳中质量分数最大的元素，化学性质非常活泼。"}, {"num": 9, "sym": "F", "name": "氟", "eng": "Fluorine", "mass": "18.998", "cat": "Other Nonmetals", "row": 2, "col": 17, "desc": "淡黄色气体，是已知化学性质最活泼、氧化性最强的非金属元素，常用于制造特氟龙不沾涂层和牙膏。"}, {"num": 10, "sym": "Ne", "name": "Ne", "eng": "Neon", "mass": "20.18", "cat": "Noble Gases", "row": 2, "col": 18, "desc": "稀有气体之一，在放电时会发出明亮的红橙色光芒，因此被广泛用于城市霓虹灯和高能激光器。"}, {"num": 11, "sym": "Na", "name": "钠", "eng": "Sodium", "mass": "22.99", "cat": "Alkali Metals", "row": 3, "col": 1, "desc": "质软、银白色的高活性金属，遇水剧烈反应甚至爆炸。其化合物氯化钠是我们日常生活中不可或缺的食盐。"}, {"num": 12, "sym": "Mg", "name": "镁", "eng": "Magnesium", "mass": "24.305", "cat": "Alkaline Earth Metals", "row": 3, "col": 2, "desc": "银白色轻金属，燃烧时发出耀眼的白光（曾用于镁光灯），其合金质轻强韧，广泛用于航空和汽车制造。"}, {"num": 13, "sym": "Al", "name": "铝", "eng": "Aluminium", "mass": "26.982", "cat": "Post-Transition Metals", "row": 3, "col": 13, "desc": "地壳中含量最丰富的金属元素，具极佳的延展性、导电性和耐腐蚀性，是现代工业、建筑和包装的支柱金属。"}, {"num": 14, "sym": "Si", "name": "硅", "eng": "Silicon", "mass": "28.085", "cat": "Metalloids", "row": 3, "col": 14, "desc": "典型的半导体材料，现代电子工业和信息技术的基石，广泛用于制造芯片、太阳能电池板和石英玻璃。"}, {"num": 15, "sym": "P", "name": "磷", "eng": "Phosphorus", "mass": "30.974", "cat": "Other Nonmetals", "row": 3, "col": 15, "desc": "植物生长的三大营养元素之一。常见的有易燃、剧毒的白磷和相对稳定的红磷，后者常用于制造安全火柴。"}, {"num": 16, "sym": "S", "name": "硫", "eng": "Sulfur", "mass": "32.06", "cat": "Other Nonmetals", "row": 3, "col": 16, "desc": "淡黄色固体非金属，俗称硫磺，具有特殊气味。常用于制造硫酸、火药、橡胶硫化以及医药农药。"}, {"num": 17, "sym": "Cl", "name": "氯", "eng": "Chlorine", "mass": "35.45", "cat": "Other Nonmetals", "row": 3, "col": 17, "desc": "黄绿色有毒气体，具有强烈刺激性气味，常用于自来水消毒、游泳池杀菌以及制造塑料（PVC）。"}, {"num": 18, "sym": "Ar", "name": "氩", "eng": "Argon", "mass": "39.948", "cat": "Noble Gases", "row": 3, "col": 18, "desc": "空气中含量最多的稀有气体（约0.93%），常用于灯泡充气以及焊接金属时的保护气，防止金属氧化。"}, {"num": 19, "sym": "K", "name": "钾", "eng": "Potassium", "mass": "39.098", "cat": "Alkali Metals", "row": 4, "col": 1, "desc": "一种极活泼的碱金属，质软如蜡，对生物体液胞内渗透压平衡至关重要，常作为钾肥广泛用于农业。"}, {"num": 20, "sym": "Ca", "name": "钙", "eng": "Calcium", "mass": "40.078", "cat": "Alkaline Earth Metals", "row": 4, "col": 2, "desc": "人体内含量最多的金属元素，是构成骨骼和牙齿的主要成分，在水泥、石灰等建筑材料中应用广泛。"}, {"num": 21, "sym": "Sc", "name": "钪", "eng": "Scandium", "mass": "44.956", "cat": "Transition Metals", "row": 4, "col": 3, "desc": "稀土元素之一，银白色过渡金属，加入铝中能显著提高合金强度和耐热性，用于高端运动器材和航天原件。"}, {"num": 22, "sym": "Ti", "name": "钛", "eng": "Titanium", "mass": "47.867", "cat": "Transition Metals", "row": 4, "col": 4, "desc": "被誉为‘太空金属’和‘生物金属’，强度高、密度小且具有极佳的耐腐蚀性和生物相容性，广泛用于潜艇、飞机及人工关节。"}, {"num": 23, "sym": "V", "name": "钒", "eng": "Vanadium", "mass": "50.942", "cat": "Transition Metals", "row": 4, "col": 5, "desc": "‘工业味精’，将其加入钢中可制造出强度极高的钒钢，广泛用于汽车底盘、桥梁和高速切削工具。"}, {"num": 24, "sym": "Cr", "name": "铬", "eng": "Chromium", "mass": "51.996", "cat": "Transition Metals", "row": 4, "col": 6, "desc": "硬度最高的金属元素，不锈钢的核心添加元素，使其具有优良的防锈耐腐蚀性能，表面镀铬常用于装饰和防磨。"}, {"num": 25, "sym": "Mn", "name": "锰", "eng": "Manganese", "mass": "54.938", "cat": "Transition Metals", "row": 4, "col": 7, "desc": "冶金工业不可或缺的元素，常用于制造高强度锰钢（如铁轨），也是干电池中二氧化锰正极材料的重要组成。"}, {"num": 26, "sym": "Fe", "name": "铁", "eng": "Iron", "mass": "55.845", "cat": "Transition Metals", "row": 4, "col": 8, "desc": "人类使用最广泛、最核心的金属。它是现代钢工业的基石，也是人体血红蛋白中输送氧气的核心原子。"}, {"num": 27, "sym": "Co", "name": "钴", "eng": "Cobalt", "mass": "58.933", "cat": "Transition Metals", "row": 4, "col": 9, "desc": "银灰色高熔点金属，常用于制造超耐热高温合金、硬质合金。近年来作为新能源汽车三元锂电池正极的重要原料。"}, {"num": 28, "sym": "Ni", "name": "镍", "eng": "Nickel", "mass": "58.693", "cat": "Transition Metals", "row": 4, "col": 10, "desc": "具磁性的银白色金属，具有极好的抗氧化和耐腐蚀能力，大量用于不锈钢生产、电镀以及硬币制造。"}, {"num": 29, "sym": "Cu", "name": "铜", "eng": "Copper", "mass": "63.546", "cat": "Transition Metals", "row": 4, "col": 11, "desc": "人类最早使用的金属之一，拥有极佳的导电性和导热性，是现代电力工业、电线电缆及电子元器件的绝对主力。"}, {"num": 30, "sym": "Zn", "name": "锌", "eng": "Zinc", "mass": "65.38", "cat": "Transition Metals", "row": 4, "col": 12, "desc": "蓝白色金属，常用于钢铁表面镀锌以防锈（牺牲阳极保护法），也是黄铜合金（铜锌）的核心成分。"}, {"num": 31, "sym": "Ga", "name": "镓", "eng": "Gallium", "mass": "69.723", "cat": "Post-Transition Metals", "row": 4, "col": 13, "desc": "奇特的金属，熔点极低（仅29.76℃），放在手心即可熔化。其化合物砷化镓是第二代半导体的核心，广泛用于LED和雷达。"}, {"num": 32, "sym": "Ge", "name": "锗", "eng": "Germanium", "mass": "72.63", "cat": "Metalloids", "row": 4, "col": 14, "desc": "灰白色准金属，优良的红外光学材料，对红外线完全透明，广泛用于红外夜视仪、光纤通信和太阳能电池。"}, {"num": 33, "sym": "As", "name": "砷", "eng": "Arsenic", "mass": "74.922", "cat": "Metalloids", "row": 4, "col": 15, "desc": "有毒的类金属，其化合物三氧化二砷俗称‘砒霜’。但在半导体工业中，它是一项极其关键的掺杂元素。"}, {"num": 34, "sym": "Se", "name": "硒", "eng": "Selenium", "mass": "78.971", "cat": "Other Nonmetals", "row": 4, "col": 16, "desc": "敏感的非金属元素，具有显著的光电导性（光照下电阻变小），常用于复印机整流器、光电管以及人体必需的微量营养素。"}, {"num": 35, "sym": "Br", "name": "溴", "eng": "Bromine", "mass": "79.904", "cat": "Other Nonmetals", "row": 4, "col": 17, "desc": "常温下唯一的深红褐色液体非金属，具强烈刺激性恶臭。常用于制造阻燃剂、医药、照相底片感光材料。"}, {"num": 36, "sym": "Kr", "name": "氪", "eng": "Krypton", "mass": "83.798", "cat": "Noble Gases", "row": 4, "col": 18, "desc": "稀有气体，放电时呈黄绿色，透光率高，常用于制作机场跑道照明灯、高强度闪光灯和准分子激光器。"}, {"num": 37, "sym": "Rb", "name": "铷", "eng": "Rubidium", "mass": "85.468", "cat": "Alkali Metals", "row": 5, "col": 1, "desc": "极活泼的碱金属，遇水剧烈反应。由于能极易释放电子，常用于制造光电管、离子推进器以及极高精度的原子钟。"}, {"num": 38, "sym": "Sr", "name": "锶", "eng": "Strontium", "mass": "87.62", "cat": "Alkaline Earth Metals", "row": 5, "col": 2, "desc": "银白色碱土金属，其盐类在燃烧时会发出极其鲜艳的艳红色光芒，是节日礼花和烟火中不可或缺的红色发光剂。"}, {"num": 39, "sym": "Y", "name": "钇", "eng": "Yttrium", "mass": "88.906", "cat": "Transition Metals", "row": 5, "col": 3, "desc": "稀土金属之一，广泛应用于超导体（如钇钡铜氧）、激光晶体（Nd:YAG）以及彩色电视机荧光粉的制造。"}, {"num": 40, "sym": "Zr", "name": "锆", "eng": "Zirconium", "mass": "91.224", "cat": "Transition Metals", "row": 5, "col": 4, "desc": "抗腐蚀性能极佳的金属，热中子吸收截面极小，是核电站反应堆核燃料包壳的核心结构材料。"}, {"num": 41, "sym": "Nb", "name": "铌", "eng": "Niobium", "mass": "92.906", "cat": "Transition Metals", "row": 5, "col": 5, "desc": "高熔点过渡金属，具有优良的超导性能，广泛应用于制造医疗核磁共振（MRI）的超导线圈和高强度钢合金。"}, {"num": 42, "sym": "Mo", "name": "钼", "eng": "Molybdenum", "mass": "95.95", "cat": "Transition Metals", "row": 5, "col": 6, "desc": "高熔点金属，能显著提高合金的淬透性、韧性和耐热性，常用于高压阀门、航空发动机叶片和军工装甲。"}, {"num": 43, "sym": "Tc", "name": "锝", "eng": "Technetium", "mass": "(98)", "cat": "Transition Metals", "row": 5, "col": 7, "desc": "人类历史上第一个人工合成的元素，具有放射性。其同位素锝-99m是核医学临床诊断中最常用的放射性示踪剂。"}, {"num": 44, "sym": "Ru", "name": "钌", "eng": "Ruthenium", "mass": "101.07", "cat": "Transition Metals", "row": 5, "col": 8, "desc": "铂族贵金属之一，化学性质极稳定，常用作高效化学催化剂，或用于制造高端电子触点及电阻器。"}, {"num": 45, "sym": "Rh", "name": "铑", "eng": "Rhodium", "mass": "102.91", "cat": "Transition Metals", "row": 5, "col": 9, "desc": "极其稀有和昂贵的铂族贵金属。具有极高的反射率和稳定的抗腐蚀性能，主要用于汽车尾气净化催化剂和高档首饰电镀。"}, {"num": 46, "sym": "Pd", "name": "钯", "eng": "Palladium", "mass": "106.42", "cat": "Transition Metals", "row": 5, "col": 10, "desc": "铂族金属，具有奇特的‘吸氢’本领（能吸收自身体积数百倍的氢气），广泛用于氢气纯化、汽车尾气催化和电子工业。"}, {"num": 47, "sym": "Ag", "name": "银", "eng": "Silver", "mass": "107.87", "cat": "Transition Metals", "row": 5, "col": 11, "desc": "所有金属中导电率、导热率和反射率最高的存在。自古用作货币和首饰，现代常用于高端电路、太阳能银浆和感光胶片。"}, {"num": 48, "sym": "Cd", "name": "镉", "eng": "Cadmium", "mass": "112.41", "cat": "Transition Metals", "row": 5, "col": 12, "desc": "蓝白色有毒金属。过去广泛用于镍镉电池、塑料稳定剂和电镀，由于‘痛痛病’等严重环境毒性，现正被严格限制。"}, {"num": 49, "sym": "In", "name": "铟", "eng": "Indium", "mass": "114.82", "cat": "Post-Transition Metals", "row": 5, "col": 13, "desc": "质地极软的金属。其化合物氧化铟锡（ITO）具有极佳的导电性和透明性，是几乎所有液晶屏幕、触摸屏的核心涂层材料。"}, {"num": 50, "sym": "Sn", "name": "锡", "eng": "Tin", "mass": "204.38", "cat": "Post-Transition Metals", "row": 5, "col": 14, "desc": "金属‘五金’之一，熔点低、无毒且抗腐蚀。广泛用于制造电子电路必不可少的焊锡，以及防止马口铁防锈涂层。"}, {"num": 51, "sym": "Sb", "name": "锑", "eng": "Antimony", "mass": "121.76", "cat": "Metalloids", "row": 5, "col": 15, "desc": "具有‘热缩冷胀’奇特物理特性的准金属。主要用作印刷合金、蓄电池板网，以及高效的阻燃剂添加料。"}, {"num": 52, "sym": "Te", "name": "碲", "eng": "Tellurium", "mass": "127.6", "cat": "Metalloids", "row": 5, "col": 16, "desc": "暗灰色准金属，主要用于红外探测器的碲镉汞半导体晶体、光盘记录介质以及新型薄膜太阳能电池。"}, {"num": 53, "sym": "I", "name": "碘", "eng": "Iodine", "mass": "126.9", "cat": "Other Nonmetals", "row": 5, "col": 17, "desc": "紫黑色非金属，受热直接升华为紫色气体。维持人体甲状腺健康的必需元素（如加碘盐），常用于医疗消毒（碘伏）。"}, {"num": 54, "sym": "Xe", "name": "氙", "eng": "Xenon", "mass": "131.29", "cat": "Noble Gases", "row": 5, "col": 18, "desc": "发光强度极高的稀有气体，用于制造汽车氙气大灯、电影放映机弧光灯。在航天领域用作先进离子推进器的推进剂。"}, {"num": 55, "sym": "Cs", "name": "铯", "eng": "Caesium", "mass": "132.91", "cat": "Alkali Metals", "row": 6, "col": 1, "desc": "金黄色、极活泼的金属，熔点极低（28.4℃）。由于其原子的超高振荡稳定性，被用来定义国际标准‘秒’（铯原子钟）。"}, {"num": 56, "sym": "Ba", "name": "钡", "eng": "Barium", "mass": "137.33", "cat": "Alkaline Earth Metals", "row": 6, "col": 2, "desc": "高活性的碱土金属。其硫酸盐‘硫酸钡’不溶于水和酸，且能有效阻挡X射线，在医学上被广泛用作胃肠造影剂（钡餐）。"}, {"num": "57-71", "sym": "La-Lu", "name": "镧系元素", "eng": "Lanthanoids", "mass": "", "cat": "Lanthanoids", "row": 6, "col": 3, "desc": "包含从镧到镥的15种特殊金属元素，统称为稀土元素，在激光、超导、强磁材料和高精尖军工中具有不可替代的作用。"}, {"num": 72, "sym": "Hf", "name": "铪", "eng": "Hafnium", "mass": "178.49", "cat": "Transition Metals", "row": 6, "col": 4, "desc": "极易发射电子且抗腐蚀的高熔点金属，能强烈吸收热中子，主要用作核反应堆的控制棒以及现代超大规模集成电路的绝缘层。"}, {"num": 73, "sym": "Ta", "name": "钽", "eng": "Tantalum", "mass": "180.95", "cat": "Transition Metals", "row": 6, "col": 5, "desc": "极具耐腐蚀性的特殊金属，遇强酸也不反应。因其电容值极大且极稳定，是高端智能手机、军工电子中‘钽电容’的核心原材料。"}, {"num": 74, "sym": "W", "name": "钨", "eng": "Tungsten", "mass": "183.84", "cat": "Transition Metals", "row": 6, "col": 6, "desc": "所有金属中熔点最高（3422℃）的存在，硬度极高。曾广泛用作白炽灯灯丝，现主要用于制造硬质合金刀具、穿甲弹及航天耐烧蚀件。"}, {"num": 75, "sym": "Re", "name": "铼", "eng": "Rhenium", "mass": "186.21", "cat": "Transition Metals", "row": 6, "col": 7, "desc": "地壳中最稀有的元素之一，熔点极高，能极大提升航空发动机单晶叶片的抗蠕变和耐热疲劳性能，是绝对的战略级军工金属。"}, {"num": 76, "sym": "Os", "name": "锇", "eng": "Osmium", "mass": "190.23", "cat": "Transition Metals", "row": 6, "col": 8, "desc": "自然界中密度最高的金属单质（22.59 g/cm³），质硬而脆。其合金极度耐磨，常用于制造高级钢笔尖、钟表轴承以及电触点。"}, {"num": 77, "sym": "Ir", "name": "铱", "eng": "Iridium", "mass": "192.22", "cat": "Transition Metals", "row": 6, "col": 9, "desc": "极其耐腐蚀和耐高温的贵金属。地壳中罕见但在陨石中含量较高（著名K-T恐龙灭绝层标志），常用于火花塞电极和高端化学催化。"}, {"num": 78, "sym": "Pt", "name": "铂", "eng": "Platinum", "mass": "195.08", "cat": "Transition Metals", "row": 6, "col": 10, "desc": "俗称‘白金’，极其高贵稳定的稀有金属。除了著名的首饰用途外，它是极其重要的汽车尾气催化剂和抗癌药物（顺铂）的核心成分。"}, {"num": 79, "sym": "Au", "name": "金", "eng": "Gold", "mass": "196.97", "cat": "Transition Metals", "row": 6, "col": 11, "desc": "自古以来人类财富和权力的终极象征，具完美的延展性和抗氧化性。在现代工业中是最高端电子元器件引线和触点的无二选择。"}, {"num": 80, "sym": "Hg", "name": "汞", "eng": "Mercury", "mass": "200.59", "cat": "Transition Metals", "row": 6, "col": 12, "desc": "俗称‘水银’，常温常压下唯一的液体金属。具有剧烈的神经毒性，曾广泛用于温度计、压力计和日光灯，现正逐步全面退出民用。"}, {"num": 81, "sym": "Tl", "name": "铊", "eng": "Thallium", "mass": "204.38", "cat": "Post-Transition Metals", "row": 6, "col": 13, "desc": "质软的蓝色金属，毒性极强且可蓄积（著名铊中毒事件）。其盐类过去曾作杀鼠剂，现代主要用于红外光学镜头和高温超导。"}, {"num": 82, "sym": "Pb", "name": "铅", "eng": "Lead", "mass": "207.2", "cat": "Post-Transition Metals", "row": 6, "col": 14, "desc": "质重、柔软的蓝色金属，熔点低，能极其有效屏蔽放射线和X射线。广泛用于汽车蓄电池（铅酸电池）以及防辐射工程。"}, {"num": 83, "sym": "Bi", "name": "铋", "eng": "Bismuth", "mass": "208.98", "cat": "Post-Transition Metals", "row": 6, "col": 15, "desc": "外观呈现美丽粉红玫瑰色金属光的重金属。非常神奇的是，它是重金属中唯一几乎完全无毒的元素，常用于医药制剂和低熔点合金。"}, {"num": 84, "sym": "Po", "name": "钋", "eng": "Polonium", "mass": "(209)", "cat": "Post-Transition Metals", "row": 6, "col": 16, "desc": "居里夫人为纪念祖国波兰而命名的放射性元素。其极具危险性，释放强烈的α射线，极微量即可致死，常用于航天器的核热源。"}, {"num": 85, "sym": "At", "name": "砹", "eng": "Astatine", "mass": "(210)", "cat": "Other Nonmetals", "row": 6, "col": 17, "desc": "地壳中最稀少的天然元素，总量不足30克，具有极高放射性和极短的半衰期。目前正在研究其用于精准靶向放射治疗癌症的潜力。"}, {"num": 86, "sym": "Rn", "name": "氡", "eng": "Radon", "mass": "(222)", "cat": "Noble Gases", "row": 6, "col": 18, "desc": "具有天然放射性的稀有气体。主要由地下岩石中的镭衰变产生，易在通风不良的室内及地下室聚集，是主要的室内健康隐患。"}, {"num": 87, "sym": "Fr", "name": "钫", "eng": "Francium", "mass": "(223)", "cat": "Alkali Metals", "row": 7, "col": 1, "desc": "极度不稳定的放射性碱金属，半衰期仅22分钟。由于极高放射性和稀缺度，目前仅用于极其基础的核物理学术研究。"}, {"num": 88, "sym": "Ra", "name": "镭", "eng": "Radium", "mass": "(226)", "cat": "Alkaline Earth Metals", "row": 7, "col": 2, "desc": "居里夫人发现的著名放射性碱土金属，在暗处能自动发出幽蓝的光芒，曾广泛用于早期夜光表盘及早期的癌症放射治疗。"}, {"num": "89-103", "sym": "Ac-Lr", "name": "锕系元素", "eng": "Actinoids", "mass": "", "cat": "Actinoids", "row": 7, "col": 3, "desc": "包含从锕到铹的15种特殊金属元素，全员均具有放射性。其中包括核电站与核武器的最核心原料——铀和钚。"}, {"num": 104, "sym": "Rf", "name": "鿔", "eng": "Rutherfordium", "mass": "(267)", "cat": "Transition Metals", "row": 7, "col": 4, "desc": "人工合成的超重超短寿命放射性元素，以‘核物理之父’卢瑟福命名，无法在自然界稳定存在，仅供实验室科学探索。"}, {"num": 105, "sym": "Db", "name": "𬭊", "eng": "Dubnium", "mass": "(268)", "cat": "Transition Metals", "row": 7, "col": 5, "desc": "人工合成放射性超重元素，以俄罗斯杜布纳联合原子核研究所命名。半衰期极短，目前无法进行任何宏观性质测定。"}, {"num": 106, "sym": "Sg", "name": "𬭳", "eng": "Seaborgium", "mass": "(269)", "cat": "Transition Metals", "row": 7, "col": 6, "desc": "为纪念诺贝尔奖得主、发现多个超铀元素的格伦·西博格而命名，是第一个在科学家在世时便用来命名的元素。"}, {"num": 107, "sym": "Bh", "name": "𬭛", "eng": "Bohrium", "mass": "(270)", "cat": "Transition Metals", "row": 7, "col": 7, "desc": "以著名量子物理学家尼尔斯·玻尔命名的人工合成元素，通过重离子加速器轰击人工合成，具有极高的放射性不稳定性。"}, {"num": 108, "sym": "Hs", "name": "𬭶", "eng": "Hassium", "mass": "(277)", "cat": "Transition Metals", "row": 7, "col": 8, "desc": "由德国达姆施塔特重离子研究所合成的超重元素，名称源于德国黑森州的拉丁语名，半衰期仅以秒计。"}, {"num": 109, "sym": "Mt", "name": "麦", "eng": "Meitnerium", "mass": "(278)", "cat": "Transition Metals", "row": 7, "col": 9, "desc": "为纪念发现核裂变的关键女物理学家莉泽·迈特纳而命名，属于超铀人工超重放射性非稳定核素。"}, {"num": 110, "sym": "Ds", "name": "𬭚", "eng": "Darmstadtium", "mass": "(281)", "cat": "Transition Metals", "row": 7, "col": 10, "desc": "以其合成地点德国达姆施塔特市命名。通过利用镍-64离子轰击铅-208靶心而极少量成功捕获的超重核。"}, {"num": 111, "sym": "Rg", "name": "𬬭", "eng": "Roentgenium", "mass": "(282)", "cat": "Transition Metals", "row": 7, "col": 11, "desc": "为纪念X射线发现者伦琴而命名。属于典型的超重过渡金属预测成员，由于寿命极短，仅能探测到个别原子的衰变链。"}, {"num": 112, "sym": "Cn", "name": "鎶", "eng": "Copernicium", "mass": "(282)", "cat": "Transition Metals", "row": 7, "col": 12, "desc": "以伟大天文学家哥白尼命名。科学家通过实验发现其蒸气表现出极强的挥发性，甚至可能在常温下呈现类似液态汞的金属特性。"}, {"num": 113, "sym": "Nh", "name": "鿭", "eng": "Nihonium", "mass": "(286)", "cat": "Post-Transition Metals", "row": 7, "col": 13, "desc": "亚洲国家（日本理化学研究所）有史以来第一次成功合成并获得命名权的元素，正式名称Nh来源于日本（Nihon）的罗马字。"}, {"num": 114, "sym": "Fl", "name": "𫓧", "eng": "Flerovium", "mass": "(289)", "cat": "Post-Transition Metals", "row": 7, "col": 14, "desc": "以俄罗斯弗廖罗夫核反应实验室命名。在原子核物理理论中，它处于著名的‘稳定岛’预言边缘，备受核物理学家关注。"}, {"num": 115, "sym": "Mc", "name": "镆", "eng": "Moscovium", "mass": "(290)", "cat": "Post-Transition Metals", "row": 7, "col": 15, "desc": "2016年获得正式命名，以莫斯科地区命名。由俄美联合实验室通过用钙-48轰击镅-243靶极而成功捕获。"}, {"num": 116, "sym": "Lv", "name": "𫟷", "eng": "Livermorium", "mass": "(293)", "cat": "Post-Transition Metals", "row": 7, "col": 16, "desc": "以美国劳伦斯利弗莫尔国家实验室命名。是一种高度不稳定的超重超铀金属，产生后在毫秒级时间内便会衰变为较轻核素。"}, {"num": 117, "sym": "Ts", "name": "鿬", "eng": "Tennessine", "mass": "(294)", "cat": "Unknown", "row": 7, "col": 17, "desc": "2016年由IUPAC正式公布，以美国田纳西州命名（当地有著名的橡树岭国家实验室），填补了周期表倒数第二个空格。"}, {"num": 118, "sym": "Og", "name": "气奥", "eng": "Oganesson", "mass": "(294)", "cat": "Unknown", "row": 7, "col": 18, "desc": "当前元素周期表的终点（118号），以依然在世的超重核物理泰斗尤里·奥加涅相命名，是人类目前掌握的质量最大的原子。"}, {"num": 57, "sym": "La", "name": "镧", "eng": "Lanthanum", "mass": "138.91", "cat": "Lanthanoids", "row": 9, "col": 4, "desc": "镧系元素的领头羊，具有高度活性。广泛应用于镍氢电池负极材料、高端数码相机镜头的高折射光学玻璃。"}, {"num": 58, "sym": "Ce", "name": "铈", "eng": "Cerium", "mass": "140.12", "cat": "Lanthanoids", "row": 9, "col": 5, "desc": "稀土中含量最丰富的金属。其氧化物二氧化铈是顶级的玻璃抛光剂，也广泛用作汽车尾气净化的催化涂层。"}, {"num": 59, "sym": "Pr", "name": "镨", "eng": "Praseodymium", "mass": "140.91", "cat": "Lanthanoids", "row": 9, "col": 6, "desc": "银白色金属，其盐类呈亮绿色。常与钕掺杂在一起，用于制造高强度的镨钕永磁合金及护目遮光镜。"}, {"num": 60, "sym": "Nd", "name": "钕", "eng": "Neodymium", "mass": "144.24", "cat": "Lanthanoids", "row": 9, "col": 7, "desc": "现代工业的‘磁王’。它与铁、硼结合制造的‘钕铁硼强磁’是目前世界上最强力的永磁体，广泛用于电动汽车电机和风力发电机。"}, {"num": 61, "sym": "Pm", "name": "钷", "eng": "Promethium", "mass": "144.24", "cat": "Lanthanoids", "row": 9, "col": 8, "desc": "镧系中唯一的纯放射性元素，极其罕见。其衰变释放的β射线可用于制造超长寿命的微型核电池（如航天和心脏起搏器）。"}, {"num": 62, "sym": "Sm", "name": "钐", "eng": "Samarium", "mass": "150.36", "cat": "Lanthanoids", "row": 9, "col": 9, "desc": "具有优异抗退磁能力的稀土元素。它与钴制造的‘钐钴磁铁’可在高达300℃的极端高温下保持极佳强磁，常用于军工导弹。"}, {"num": 63, "sym": "Eu", "name": "铕", "eng": "Europium", "mass": "151.96", "cat": "Lanthanoids", "row": 9, "col": 10, "desc": "最活泼的稀土元素。它是无机荧光粉的绝对核心，能发出极其纯正的鲜艳红色（早期彩电及防伪钞票油墨的重要发光源）。"}, {"num": 64, "sym": "Gd", "name": "钆", "eng": "Gadolinium", "mass": "157.25", "cat": "Lanthanoids", "row": 9, "col": 11, "desc": "具有独特的磁热效应（磁化时发热，退磁时吸热）。由于其极强的顺磁性，其螯合物在医疗上是做核磁共振（MRI）最常用的显影剂。"}, {"num": 65, "sym": "Tb", "name": "铽", "eng": "Terbium", "mass": "158.93", "cat": "Lanthanoids", "row": 9, "col": 12, "desc": "银白色特殊稀土金属。在放电或光照下能发出高纯度的绿色光芒，是高端三基色节能灯和超声波换能器（特芬诺-D磁致伸缩材料）的关键成分。"}, {"num": 66, "sym": "Dy", "name": "镝", "eng": "Dysprosium", "mass": "162.5", "cat": "Lanthanoids", "row": 9, "col": 13, "desc": "高熔点重稀土元素。将其作为微量添加剂掺入钕铁硼磁体中，可极大提升其在高烧环境下的耐热和抗退磁能力，对新能源车至关重要。"}, {"num": 67, "sym": "Ho", "name": "钬", "eng": "Holmium", "mass": "164.93", "cat": "Lanthanoids", "row": 9, "col": 14, "desc": "拥有已知所有元素中最高的磁矩。利用其制造的钬激光在现代医学外科手术（如碎石、前列腺切除）中具有极其精准微创的切除效果。"}, {"num": 68, "sym": "Er", "name": "铒", "eng": "Erbium", "mass": "167.26", "cat": "Lanthanoids", "row": 9, "col": 15, "desc": "现代信息高速公路的‘加油站’。掺铒光纤放大器（EDFA）是光纤通信的核心，能不经光电转换直接放大减弱的光信号。"}, {"num": 69, "sym": "Tm", "name": "铥", "eng": "Thulium", "mass": "168.93", "cat": "Lanthanoids", "row": 9, "col": 16, "desc": "稀土元素中最稀少、最昂贵的成员之一。在核反应堆中受照射产生的铥-170同位素可用作便携式轻量化临床及工业X射线源。"}, {"num": 70, "sym": "Yb", "name": "镱", "eng": "Ytterbium", "mass": "173.05", "cat": "Lanthanoids", "row": 9, "col": 17, "desc": "银白色软金属。在制造高强度激光器、全光纤激光器中作为极为关键的活性多能掺杂剂，同时也用于制造高精度高稳定的光晶格原子钟。"}, {"num": 71, "sym": "Lu", "name": "镥", "eng": "Lutetium", "mass": "174.97", "cat": "Lanthanoids", "row": 9, "col": 18, "desc": "稀土元素周期表的最后一员，也是最重、最坚硬的稀土金属。其闪烁晶体（LSO）是医学高端影像设备PET-CT扫描仪的最核心探测材料。"}, {"num": 89, "sym": "Ac", "name": "锕", "eng": "Actinium", "mass": "(227)", "cat": "Actinoids", "row": 10, "col": 4, "desc": "锕系元素的鼻祖，具有强放射性。由于其高比活度，在现代靶向α粒子肿瘤放射治疗（TAT）中展现出突破性的应用前景。"}, {"num": 90, "sym": "Th", "name": "钍", "eng": "Thorium", "mass": "232.04", "cat": "Actinoids", "row": 10, "col": 5, "desc": "储量极为丰富的新型潜在核燃料。相比于铀，钍反应堆安全性极高且极不易产生核扩散副产物，是下一代第四代核能技术的热点。"}, {"num": 91, "sym": "Pa", "name": "镤", "eng": "Protactinium", "mass": "231.04", "cat": "Actinoids", "row": 10, "col": 6, "desc": "极稀少、毒性高且极不稳定的放射性金属元素。属于铀衰变链的中间体，目前除了基础原子核物理研究外几乎没有任何工业应用。"}, {"num": 92, "sym": "U", "name": "铀", "eng": "Uranium", "mass": "238.03", "cat": "Actinoids", "row": 10, "col": 7, "desc": "重金属放射性元素，现代核工业、核电站以及核武器的绝对终极核心燃料。其铀-235同位素可引发巨大的自持链式核裂变。"}, {"num": 93, "sym": "Np", "name": "镎", "eng": "Neptunium", "mass": "(237)", "cat": "Actinoids", "row": 10, "col": 8, "desc": "第一个超铀人工放射性元素。产生于核反应堆废料中，是铀转变为高危险超铀核素的重要中间链，其研究对核废料处置意义重大。"}, {"num": 94, "sym": "Pu", "name": "钚", "eng": "Plutonium", "mass": "(244)", "cat": "Actinoids", "row": 10, "col": 9, "desc": "人工合成的高危险放射性超铀重金属。钚-239是原子弹和核反应堆的极佳裂变材料；钚-238则是深空探测深空探测器（如旅行者号）核电池的理想热源。"}, {"num": 95, "sym": "Am", "name": "镅", "eng": "Americium", "mass": "(243)", "cat": "Actinoids", "row": 10, "col": 10, "desc": "人工合成放射性超铀元素。它是极少数进入千家万户的放射性元素——其释放的微量α粒子被广泛用于家用电离式烟雾报警器中。"}, {"num": 96, "sym": "Cm", "name": "锔", "eng": "Curium", "mass": "(247)", "cat": "Actinoids", "row": 10, "col": 11, "desc": "为纪念居里夫妇而命名的人工合成高放射性重金属。它能释放密集的α粒子，常被用来作为深空探测光谱仪（如火星车APXS）的激发辐射源。"}, {"num": 97, "sym": "Bk", "name": "锫", "eng": "Berkelium", "mass": "(247)", "cat": "Actinoids", "row": 10, "col": 12, "desc": "以合成地美国伯克利大学命名的人工超铀元素。全球产量极少，主要被用作在加速器中轰击合成更重、更新未知元素的珍贵靶材料。"}, {"num": 98, "sym": "Cf", "name": "锎", "eng": "Californium", "mass": "(251)", "cat": "Actinoids", "row": 10, "col": 13, "desc": "极其昂贵的人工合成金属，强中子源发射体。极其微小的体积便能释放海量中子，广泛用于油田测井、核反应堆启动引导和癌症中子治疗。"}, {"num": 99, "sym": "Es", "name": "锿", "eng": "Einsteinium", "mass": "(252)", "cat": "Actinoids", "row": 10, "col": 14, "desc": "首次在1952年人类第一次氢弹爆炸的致命残留辐射尘埃中被意外分离发现，为纪念伟大物理学家爱因斯坦而正式命名。"}, {"num": 100, "sym": "Fm", "name": "镄", "eng": "Fermium", "mass": "(257)", "cat": "Actinoids", "row": 10, "col": 15, "desc": "人工合成重超铀核素，同样在首枚氢弹爆炸废墟中被发现，以核反应堆之父费米命名。是可通过中子轰击较轻元素产生的最重元素。"}, {"num": 101, "sym": "Md", "name": "钔", "eng": "Mendelevium", "mass": "(258)", "cat": "Actinoids", "row": 10, "col": 16, "desc": "人工合成放射性强超铀核，以元素周期表奠基人门捷列夫命名。它是人类第一次实现逐个原子单体计数（Counted on an atom-by-atom basis）成功捕获的超重核。"}, {"num": 102, "sym": "No", "name": "锘", "eng": "Nobelium", "mass": "(259)", "cat": "Actinoids", "row": 10, "col": 17, "desc": "人工合成高度放射性核素，以炸药发明及诺贝尔奖创立者诺贝尔命名，在重离子加速器中通过碳离子轰击锔靶产生，半衰期仅数分钟。"}, {"num": 103, "sym": "Lr", "name": "铹", "eng": "Lawrencium", "mass": "(266)", "cat": "Actinoids", "row": 10, "col": 18, "desc": "锕系元素的收尾成员，以回旋加速器发明者劳伦斯命名。全员均属于高能加速器极微量产物，仅具有极其纯粹的理论物理学边界探索意义。"}];
+        const categoriesCn = {"Alkali Metals": "碱金属", "Alkaline Earth Metals": "碱土金属", "Lanthanoids": "镧系元素", "Actinoids": "锕系元素", "Transition Metals": "过渡金属", "Post-Transition Metals": "后过渡金属", "Metalloids": "准金属", "Other Nonmetals": "其他非金属", "Noble Gases": "惰性气体", "Unknown": "未知元素"};
+        const categoryColors = {"Alkali Metals": "#ff9100", "Alkaline Earth Metals": "#ffea00", "Lanthanoids": "#ff4081", "Actinoids": "#e040fb", "Transition Metals": "#ff5252", "Post-Transition Metals": "#00e5ff", "Metalloids": "#00e676", "Other Nonmetals": "#b2ff59", "Noble Gases": "#2979ff", "Unknown": "#b0bec5"};
+
+        const table = document.getElementById('periodic-table');
+        const legend = document.getElementById('legend');
+        const infoPlaceholder = document.getElementById('info-placeholder');
+        const infoContent = document.getElementById('info-content');
+        const infoPanel = document.getElementById('info-panel');
+
+        // 1. 初始化渲染图例
+        Object.keys(categoriesCn).forEach(catKey => {
+            const item = document.createElement('div');
+            item.className = 'legend-item';
+            
+            const colorBox = document.createElement('div');
+            colorBox.className = 'legend-color';
+            colorBox.style.backgroundColor = categoryColors[catKey];
+            colorBox.style.boxShadow = `0 0 6px ${categoryColors[catKey]}`;
+            
+            const text = document.createElement('span');
+            text.innerText = categoriesCn[catKey];
+            
+            item.appendChild(colorBox);
+            item.appendChild(text);
+            legend.appendChild(item);
+            
+            // 点击图例高亮同类别元素
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.element').forEach(el => {
+                    if(el.dataset.cat === catKey) {
+                        el.style.transform = 'translateY(-3px) scale(1.04)';
+                        el.style.boxShadow = `0 0 15px ${categoryColors[catKey]}`;
+                    } else {
+                        el.style.transform = '';
+                        el.style.boxShadow = '';
+                    }
+                });
+                setTimeout(() => {
+                    document.querySelectorAll('.element').forEach(el => {
+                        el.style.transform = '';
+                        el.style.boxShadow = '';
+                    });
+                }, 1500);
+            });
+        });
+
+        // 2. 动态渲染118个元素至网格
+        elements.forEach(element => {
+            const cell = document.createElement('div');
+            cell.className = 'element';
+            
+            // 处理57-71及89-103占位盒子的小指示器样式
+            if(element.num === "57-71") cell.classList.add('lanthanide-indicator');
+            if(element.num === "89-103") cell.classList.add('actinide-indicator');
+
+            cell.style.gridColumnStart = element.col;
+            cell.style.gridRowStart = element.row;
+            
+            const color = categoryColors[element.cat] || '#ffffff';
+            cell.style.setProperty('--neon-color', color);
+            cell.style.borderColor = color + '33'; // 默认淡色半透明边框
+
+            cell.dataset.cat = element.cat;
+
+            cell.innerHTML = `
+                <div class="num">${element.num}</div>
+                <div class="sym">${element.sym}</div>
+                <div class="name">${element.name}</div>
+                <div class="mass">${element.mass}</div>
+            `;
+
+            // 交互：点击元素事件处理
+            cell.addEventListener('click', () => {
+                // 移除之前的高亮
+                document.querySelectorAll('.element').forEach(el => el.classList.remove('active'));
+                // 激活当前
+                cell.classList.add('active');
+
+                // 刷新底部详情面板
+                infoPlaceholder.style.display = 'none';
+                infoContent.style.display = 'block';
+                
+                infoPanel.style.setProperty('--panel-accent', color);
+                infoPanel.style.borderColor = color + '44';
+                infoPanel.style.boxShadow = `0 10px 30px rgba(0,0,0,0.5), 0 0 15px ${color}11`;
+
+                document.getElementById('p-sym').innerText = element.sym;
+                document.getElementById('p-name').innerText = element.name;
+                document.getElementById('p-eng').innerText = element.eng;
+                document.getElementById('p-num').innerText = element.num;
+                document.getElementById('p-mass').innerText = element.mass || '见展开系';
+                document.getElementById('p-cat').innerText = categoriesCn[element.cat] || element.cat;
+                document.getElementById('p-desc').innerText = element.desc;
+            });
+
+            table.appendChild(cell);
+        });
+    </script>
+</body>
+</html>
